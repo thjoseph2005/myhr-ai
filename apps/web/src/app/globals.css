@@ -1,0 +1,78 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+  --background: #f3f5f8;
+  --foreground: #102038;
+  --surface: #ffffff;
+  --surface-muted: #eef2f6;
+  --border: #d7dee8;
+  --navy-950: #0b1d34;
+  --navy-900: #122b4a;
+  --navy-700: #35506f;
+  --red-accent: #bf2d34;
+}
+
+html {
+  min-height: 100%;
+  background: var(--background);
+}
+
+body {
+  min-height: 100vh;
+  color: var(--foreground);
+  background: var(--background);
+  font-feature-settings: "rlig" 1, "calt" 1;
+}
+
+* {
+  border-color: var(--border);
+}
+
+::selection {
+  background: rgba(191, 45, 52, 0.16);
+  color: var(--foreground);
+}
+
+.bg-app-shell {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.65), rgba(255, 255, 255, 0.65)),
+    var(--background);
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(to right, rgba(17, 38, 64, 0.035) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(17, 38, 64, 0.035) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.2), transparent 70%);
+  opacity: 0.35;
+}
+
+button,
+textarea {
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease,
+    color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+textarea {
+  scrollbar-gutter: stable;
+}
+
+textarea::-webkit-scrollbar {
+  width: 8px;
+}
+
+textarea::-webkit-scrollbar-thumb {
+  background: rgba(18, 43, 74, 0.22);
+  border-radius: 9999px;
+}

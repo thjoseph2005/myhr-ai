@@ -1,0 +1,22 @@
+type: Microsoft.App/containerApps
+location: eastus
+name: myhr-ai-web
+properties:
+  managedEnvironmentId: /subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/example/providers/Microsoft.App/managedEnvironments/example-env
+  configuration:
+    ingress:
+      external: true
+      targetPort: 3000
+  template:
+    containers:
+      - image: myregistry.azurecr.io/myhr-ai-web:latest
+        name: web
+        env:
+          - name: NEXT_PUBLIC_API_BASE_URL
+            value: https://myhr-ai-api.example.azurecontainerapps.io
+        resources:
+          cpu: 0.5
+          memory: 1Gi
+    scale:
+      minReplicas: 1
+      maxReplicas: 2

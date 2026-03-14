@@ -1,0 +1,32 @@
+# Node
+node_modules/
+.next/
+coverage/
+pnpm-lock.yaml
+
+# Python
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.venv/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+
+# Project data
+data/*.jsonl
+data/*.ndjson
+!data/.gitkeep

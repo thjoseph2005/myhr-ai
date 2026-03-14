@@ -1,0 +1,33 @@
+type: Microsoft.App/containerApps
+location: eastus
+name: myhr-ai-api
+properties:
+  managedEnvironmentId: /subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/example/providers/Microsoft.App/managedEnvironments/example-env
+  configuration:
+    ingress:
+      external: true
+      targetPort: 8000
+    secrets:
+      - name: azure-openai-api-key
+        value: replace-me
+      - name: azure-search-api-key
+        value: replace-me
+  template:
+    containers:
+      - image: myregistry.azurecr.io/myhr-ai-api:latest
+        name: api
+        env:
+          - name: API_HOST
+            value: 0.0.0.0
+          - name: API_PORT
+            value: "8000"
+          - name: AZURE_OPENAI_API_KEY
+            secretRef: azure-openai-api-key
+          - name: AZURE_SEARCH_API_KEY
+            secretRef: azure-search-api-key
+        resources:
+          cpu: 0.5
+          memory: 1Gi
+    scale:
+      minReplicas: 1
+      maxReplicas: 2

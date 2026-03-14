@@ -1,7 +1,10 @@
+from pathlib import Path
+
 from app.core.config import Settings
 from app.domain.models import RetrievedChunk
 from app.schemas.chat import ChatRequest
-from app.services.rag_service import NOT_FOUND_MESSAGE, RAGService
+from app.services.grounding_evaluator_service import NOT_FOUND_MESSAGE
+from app.services.rag_service import RAGService
 
 
 class FakeOpenAIService:
@@ -19,9 +22,8 @@ class FakeSearchService:
     def __init__(self, chunks: list[RetrievedChunk]) -> None:
         self.chunks = chunks
 
-    def search(self, query: str, vector: list[float], top_k: int) -> list[RetrievedChunk]:
+    def retrieve(self, query: str, top_k: int) -> list[RetrievedChunk]:
         assert query
-        assert vector
         assert top_k == 3
         return self.chunks
 
@@ -42,18 +44,16 @@ def build_settings() -> Settings:
 
 async def test_returns_grounded_answer_with_citations() -> None:
     service = RAGService(build_settings())
-    service.openai_service = FakeOpenAIService("Employees receive 15 vacation days per year.")
-    service.search_service = FakeSearchService(
-        [
-            RetrievedChunk(
-                chunk_id="hrpolicy-p12-c1",
-                document_id="hrpolicy",
-                document_name="HRPolicy.pdf",
-                page_number=12,
-                content="Full-time employees receive 15 vacation days per year.",
-                score=1.0,
-            )
-        ]
+    service.answer_generation_service = FakeOpenAIService("Employees receive 15 vacation days per year.")
+    service.retriever_service = FakeSearchService(
+        [RetrievedChunk(
+            chunk_id="hrpolicy-p12-c1",
+            document_id="hrpolicy",
+            document_name="HRPolicy.pdf",
+            page_number=12,
+            content="Full-time employees receive 15 vacation days per year.",
+            score=1.0,
+        )]
     )
 
     response = await service.answer_question(
@@ -67,18 +67,16 @@ async def test_returns_grounded_answer_with_citations() -> None:
 
 async def test_returns_exact_not_found_message_when_answer_is_unsupported() -> None:
     service = RAGService(build_settings())
-    service.openai_service = FakeOpenAIService(NOT_FOUND_MESSAGE)
-    service.search_service = FakeSearchService(
-        [
-            RetrievedChunk(
-                chunk_id="hrpolicy-p12-c1",
-                document_id="hrpolicy",
-                document_name="HRPolicy.pdf",
-                page_number=12,
-                content="Full-time employees receive 15 vacation days per year.",
-                score=1.0,
-            )
-        ]
+    service.answer_generation_service = FakeOpenAIService(NOT_FOUND_MESSAGE)
+    service.retriever_service = FakeSearchService(
+        [RetrievedChunk(
+            chunk_id="hrpolicy-p12-c1",
+            document_id="hrpolicy",
+            document_name="HRPolicy.pdf",
+            page_number=12,
+            content="Full-time employees receive 15 vacation days per year.",
+            score=1.0,
+        )]
     )
 
     response = await service.answer_question(
@@ -88,3 +86,28 @@ async def test_returns_exact_not_found_message_when_answer_is_unsupported() -> N
     assert response.grounded is False
     assert response.answer == NOT_FOUND_MESSAGE
     assert response.citations == []
+
+
+async def test_routes_structured_hr_question_to_sql_path(tmp_path: Path) -> None:
+    service = RAGService(
+        Settings(
+            APP_ENV="test",
+            LOG_LEVEL="INFO",
+            API_CORS_ORIGINS=["http://localhost:3000"],
+            DEFAULT_CHAT_TOP_K=3,
+            DEFAULT_CHAT_TEMPERATURE=0.1,
+            MAX_HISTORY_MESSAGES=4,
+            INDEXER_BATCH_SIZE=10,
+            KNOWLEDGE_BASE_PATH="/tmp/knowledge_base",
+            HR_DATABASE_PATH=str(tmp_path / "hr.sqlite3"),
+            MOCK_AZURE_MODE=True,
+        )
+    )
+
+    response = await service.answer_question(
+        ChatRequest(question="Who is in the Finance department?", history=[])
+    )
+
+    assert response.grounded is True
+    assert "Finance" in response.answer
+    assert response.citations[0].document_name == "HR Database"

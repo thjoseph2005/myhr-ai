@@ -9,6 +9,7 @@ services:
       - .env
     environment:
       KNOWLEDGE_BASE_PATH: /app/data/knowledge_base
+      HR_DATABASE_PATH: /app/data/hr.sqlite3
     ports:
       - "8000:8000"
     volumes:

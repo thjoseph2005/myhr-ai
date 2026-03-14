@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 
-.PHONY: setup dev dev-web dev-api lint test format ingest docker-up docker-down
+.PHONY: setup dev dev-web dev-api lint test format ingest seed-db docker-up docker-down
 
 setup:
 	cd apps/web && npm install
@@ -29,6 +29,9 @@ format:
 
 ingest:
 	cd services/api && source .venv/bin/activate && python -m app.services.ingestion_cli --path ../../data/knowledge_base
+
+seed-db:
+	cd services/api && source .venv/bin/activate && python -m app.services.hr_database_cli
 
 docker-up:
 	docker compose up --build

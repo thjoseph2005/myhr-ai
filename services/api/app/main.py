@@ -7,6 +7,7 @@ from fastapi.responses import ORJSONResponse
 from app.api.routes import chat, documents, health
 from app.core.config import get_settings
 from app.core.logging import configure_logging, get_logger
+from app.services.hr_database_service import HRDatabaseService
 
 settings = get_settings()
 configure_logging(settings.log_level)
@@ -16,6 +17,8 @@ logger = get_logger(__name__)
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     logger.info("starting_application environment=%s", settings.app_env)
+    HRDatabaseService(settings).ensure_database()
+    logger.info("hr_database_ready path=%s", settings.hr_database_path)
     yield
     logger.info("stopping_application")
 

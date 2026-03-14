@@ -29,4 +29,6 @@ build/
 # Project data
 data/*.jsonl
 data/*.ndjson
+data/*.db
+data/*.sqlite3
 !data/.gitkeep

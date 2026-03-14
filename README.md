@@ -2,6 +2,8 @@
 
 `myhr-ai` is a monorepo starter for an HR policy assistant that answers questions from a repository-managed knowledge base. PDFs live in `data/knowledge_base/`, the FastAPI backend indexes them for RAG, and the Next.js frontend provides a ChatGPT-like enterprise chat experience with citations.
 
+The backend also supports a lightweight SQLite HR database for employee and department lookups, so the chat can answer structured HR questions alongside policy questions.
+
 ## Repository Structure
 
 ```text
@@ -43,6 +45,16 @@ make ingest
 
 That command reindexes every PDF under `data/knowledge_base/`.
 
+## Seed The HR Database
+
+To create or reset the lightweight SQLite HR database with seed data:
+
+```bash
+make seed-db
+```
+
+That command creates `data/hr.sqlite3` from `data/hr_seed.sql`.
+
 The backend also exposes:
 
 - `GET /health`
@@ -51,6 +63,7 @@ The backend also exposes:
 - `POST /api/chat`
 
 `GET /api/documents/status` includes the configured knowledge base path, discovered documents, per-document indexed state, total indexed chunks, and the last indexed timestamp when available.
+`POST /api/chat` now routes policy questions to PDF RAG and department/employee questions to the SQLite HR database.
 
 ## Run Locally
 
@@ -87,6 +100,7 @@ Fill these values in `.env` when you are ready to use Azure:
 
 The app uses mock retrieval/generation locally when `MOCK_AZURE_MODE=true` or when Azure credentials are missing.
 The default knowledge base path points at `data/knowledge_base`, where `hr_policy.pdf` is the expected starter document.
+The default HR database path points at `data/hr.sqlite3`.
 
 ## Docker
 

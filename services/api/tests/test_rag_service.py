@@ -1,3 +1,5 @@
+from app.agents.context import AgentContext
+from app.agents.runner import AgentRunnerService
 from pathlib import Path
 
 from app.core.config import Settings
@@ -6,6 +8,8 @@ from app.schemas.chat import ChatRequest
 from app.services.grounding_evaluator_service import NOT_FOUND_MESSAGE
 from app.services.rag_service import RAGService
 from app.schemas.routing import RouteDecision
+from app.tools.hr_sql_tool import HRSQLTool
+from app.tools.policy_search_tool import PolicySearchTool
 
 
 class FakeOpenAIService:
@@ -58,7 +62,45 @@ def build_settings() -> Settings:
         MAX_HISTORY_MESSAGES=4,
         INDEXER_BATCH_SIZE=10,
         KNOWLEDGE_BASE_PATH="/tmp/knowledge_base",
+        AGENT_MEMORY_PATH="/tmp/test-agent-memory.sqlite3",
         MOCK_AZURE_MODE=True,
+    )
+
+
+def rebind_agent_runner(service: RAGService) -> None:
+    service.policy_search_tool = PolicySearchTool(
+        service.retriever_service,
+        service.prompt_builder_service,
+        service.answer_generation_service,
+        service.grounding_evaluator_service,
+        top_k=service.settings.default_chat_top_k,
+        max_history_messages=service.settings.max_history_messages,
+    )
+    service.hr_sql_tool = HRSQLTool(
+        service.hr_database_service,
+        service.sql_query_builder_service,
+        service.llm_sql_planner_service,
+        service.sql_tool_service,
+        service.structured_answer_service,
+    )
+    service.agent_runner_service = AgentRunnerService(
+        AgentContext(
+            settings=service.settings,
+            request_id="test",
+            session_id=None,
+            llm_router_service=service.llm_router_service,
+            retriever_service=service.retriever_service,
+            prompt_builder_service=service.prompt_builder_service,
+            answer_generation_service=service.answer_generation_service,
+            grounding_evaluator_service=service.grounding_evaluator_service,
+            hr_database_service=service.hr_database_service,
+            sql_query_builder_service=service.sql_query_builder_service,
+            llm_sql_planner_service=service.llm_sql_planner_service,
+            sql_tool_service=service.sql_tool_service,
+            structured_answer_service=service.structured_answer_service,
+            policy_search_tool=service.policy_search_tool,
+            hr_sql_tool=service.hr_sql_tool,
+        )
     )
 
 
@@ -76,6 +118,7 @@ async def test_returns_grounded_answer_with_citations() -> None:
             score=1.0,
         )]
     )
+    rebind_agent_runner(service)
 
     response = await service.answer_question(
         ChatRequest(question="How many vacation days do employees get?", history=[])
@@ -100,6 +143,7 @@ async def test_returns_exact_not_found_message_when_answer_is_unsupported() -> N
             score=1.0,
         )]
     )
+    rebind_agent_runner(service)
 
     response = await service.answer_question(
         ChatRequest(question="Does the policy mention tuition reimbursement?", history=[])
@@ -126,6 +170,7 @@ async def test_routes_structured_hr_question_to_sql_path(tmp_path: Path) -> None
         )
     )
     service.llm_router_service = FakeLLMRouterService("structured_hr")
+    rebind_agent_runner(service)
 
     response = await service.answer_question(
         ChatRequest(question="Who is in the Finance department?", history=[])
@@ -164,6 +209,7 @@ async def test_uses_llm_sql_planner_when_rule_planner_has_no_match(tmp_path: Pat
             },
         )()
     )
+    rebind_agent_runner(service)
 
     response = await service.answer_question(
         ChatRequest(question="How many employees are there in the company?", history=[])
@@ -172,3 +218,53 @@ async def test_uses_llm_sql_planner_when_rule_planner_has_no_match(tmp_path: Pat
     assert response.grounded is True
     assert "employees in the HR database" in response.answer
     assert response.citations[0].document_name == "HR Database"
+
+
+async def test_uses_session_memory_when_session_id_is_provided(tmp_path: Path) -> None:
+    service = RAGService(
+        Settings(
+            APP_ENV="test",
+            LOG_LEVEL="INFO",
+            API_CORS_ORIGINS=["http://localhost:3000"],
+            DEFAULT_CHAT_TOP_K=3,
+            DEFAULT_CHAT_TEMPERATURE=0.1,
+            MAX_HISTORY_MESSAGES=4,
+            INDEXER_BATCH_SIZE=10,
+            KNOWLEDGE_BASE_PATH="/tmp/knowledge_base",
+            AGENT_MEMORY_PATH=str(tmp_path / "agent-memory.sqlite3"),
+            MOCK_AZURE_MODE=True,
+        )
+    )
+    service.llm_router_service = FakeLLMRouterService("policy_rag")
+    service.answer_generation_service = FakeOpenAIService("Employees receive 15 vacation days per year.")
+    service.retriever_service = FakeSearchService(
+        [RetrievedChunk(
+            chunk_id="hrpolicy-p12-c1",
+            document_id="hrpolicy",
+            document_name="HRPolicy.pdf",
+            page_number=12,
+            content="Full-time employees receive 15 vacation days per year.",
+            score=1.0,
+        )]
+    )
+    rebind_agent_runner(service)
+
+    first = await service.answer_question(
+        ChatRequest(
+            question="How many vacation days do employees get?",
+            history=[],
+            session_id="demo-session",
+        )
+    )
+    second = await service.answer_question(
+        ChatRequest(
+            question="Can you remind me again?",
+            history=[],
+            session_id="demo-session",
+        )
+    )
+
+    assert first.grounded is True
+    assert second.grounded is True
+    stored_history = service.agent_runner_service.session_store.load_history("demo-session")
+    assert len(stored_history) == 4

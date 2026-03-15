@@ -35,6 +35,11 @@ class Settings(BaseSettings):
         default=str(REPOSITORY_ROOT / "data" / "hr.sqlite3"),
         alias="HR_DATABASE_PATH",
     )
+    openai_agents_enabled: bool = Field(default=False, alias="OPENAI_AGENTS_ENABLED")
+    agent_memory_path: str = Field(
+        default=str(REPOSITORY_ROOT / "data" / "agent_memory.sqlite3"),
+        alias="AGENT_MEMORY_PATH",
+    )
     sql_max_rows: int = Field(default=25, alias="SQL_MAX_ROWS")
     mock_azure_mode: bool = Field(default=False, alias="MOCK_AZURE_MODE")
 

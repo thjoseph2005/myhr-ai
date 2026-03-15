@@ -1,11 +1,12 @@
 from functools import lru_cache
 
+from app.agents.context import AgentContext
+from app.agents.runner import AgentRunnerService
 from app.core.config import Settings, get_settings
-from app.domain.models import RetrievedChunk
-from app.schemas.chat import ChatRequest, ChatResponse, Citation
+from app.schemas.chat import ChatRequest, ChatResponse
 from app.services.answer_generation_service import AnswerGenerationService
 from app.services.embedding_service import EmbeddingService
-from app.services.grounding_evaluator_service import GroundingEvaluatorService, NOT_FOUND_MESSAGE
+from app.services.grounding_evaluator_service import GroundingEvaluatorService
 from app.services.hr_database_service import HRDatabaseService
 from app.services.llm_router_service import LLMRouterService
 from app.services.llm_sql_planner_service import LLMSQLPlannerService
@@ -16,6 +17,8 @@ from app.services.search_service import SearchService
 from app.services.sql_query_builder_service import SQLQueryBuilderService
 from app.services.sql_tool_service import SQLToolService
 from app.services.structured_answer_service import StructuredAnswerService
+from app.tools.hr_sql_tool import HRSQLTool
+from app.tools.policy_search_tool import PolicySearchTool
 
 
 class RAGService:
@@ -37,62 +40,43 @@ class RAGService:
         )
         self.sql_tool_service = SQLToolService(self.hr_database_service)
         self.structured_answer_service = StructuredAnswerService()
+        self.policy_search_tool = PolicySearchTool(
+            self.retriever_service,
+            self.prompt_builder_service,
+            self.answer_generation_service,
+            self.grounding_evaluator_service,
+            top_k=self.settings.default_chat_top_k,
+            max_history_messages=self.settings.max_history_messages,
+        )
+        self.hr_sql_tool = HRSQLTool(
+            self.hr_database_service,
+            self.sql_query_builder_service,
+            self.llm_sql_planner_service,
+            self.sql_tool_service,
+            self.structured_answer_service,
+        )
+        self.agent_runner_service = AgentRunnerService(
+            AgentContext(
+                settings=self.settings,
+                request_id="bootstrap",
+                session_id=None,
+                llm_router_service=self.llm_router_service,
+                retriever_service=self.retriever_service,
+                prompt_builder_service=self.prompt_builder_service,
+                answer_generation_service=self.answer_generation_service,
+                grounding_evaluator_service=self.grounding_evaluator_service,
+                hr_database_service=self.hr_database_service,
+                sql_query_builder_service=self.sql_query_builder_service,
+                llm_sql_planner_service=self.llm_sql_planner_service,
+                sql_tool_service=self.sql_tool_service,
+                structured_answer_service=self.structured_answer_service,
+                policy_search_tool=self.policy_search_tool,
+                hr_sql_tool=self.hr_sql_tool,
+            )
+        )
 
     async def answer_question(self, payload: ChatRequest) -> ChatResponse:
-        decision = self.llm_router_service.route(payload.question, payload.history)
-        if decision.route == "structured_hr":
-            return self._answer_structured_question(payload)
-
-        return self._answer_policy_question(payload)
-
-    def _answer_policy_question(self, payload: ChatRequest) -> ChatResponse:
-        retrieved = self.retriever_service.retrieve(payload.question, self.settings.default_chat_top_k)
-
-        if not retrieved:
-            return ChatResponse(
-                answer=NOT_FOUND_MESSAGE,
-                citations=[],
-                grounded=False,
-            )
-
-        messages = self.prompt_builder_service.build_messages(
-            payload,
-            retrieved,
-            self.settings.max_history_messages,
-        )
-        answer = self.answer_generation_service.generate_answer(messages)
-        grounded = self.grounding_evaluator_service.is_grounded(answer)
-
-        return ChatResponse(
-            answer=answer if grounded else NOT_FOUND_MESSAGE,
-            citations=self._build_citations(retrieved if grounded else []),
-            grounded=grounded,
-        )
-
-    def _answer_structured_question(self, payload: ChatRequest) -> ChatResponse:
-        self.hr_database_service.ensure_database()
-        plan = self.sql_query_builder_service.build(payload.question)
-        if plan is None:
-            plan = self.llm_sql_planner_service.build(payload.question)
-        if plan is None:
-            return ChatResponse(answer=NOT_FOUND_MESSAGE, citations=[], grounded=False)
-
-        rows = self.sql_tool_service.run_query(plan)
-        answer, citations, grounded = self.structured_answer_service.build_answer(plan, rows)
-        return ChatResponse(answer=answer, citations=citations, grounded=grounded)
-
-    @staticmethod
-    def _build_citations(retrieved: list[RetrievedChunk]) -> list[Citation]:
-        return [
-            Citation(
-                document_id=chunk.document_id,
-                document_name=chunk.document_name,
-                page_number=chunk.page_number,
-                chunk_id=chunk.chunk_id,
-                excerpt=chunk.content[:280].strip(),
-            )
-            for chunk in retrieved
-        ]
+        return await self.agent_runner_service.run_chat(payload)
 
 
 @lru_cache

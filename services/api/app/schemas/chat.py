@@ -9,6 +9,7 @@ class ChatMessage(BaseModel):
 class ChatRequest(BaseModel):
     question: str = Field(min_length=3, max_length=4000)
     history: list[ChatMessage] = Field(default_factory=list)
+    session_id: str | None = Field(default=None, max_length=128)
 
 
 class Citation(BaseModel):

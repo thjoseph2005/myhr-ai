@@ -3,6 +3,7 @@
 `myhr-ai` is a monorepo starter for an HR policy assistant that answers questions from a repository-managed knowledge base. PDFs live in `data/knowledge_base/`, the FastAPI backend indexes them for RAG, and the Next.js frontend provides a ChatGPT-like enterprise chat experience with citations.
 
 The backend also supports a lightweight SQLite HR database for employee and department lookups, so the chat can answer structured HR questions alongside policy questions.
+Phase 1 of the agentic migration is now in place: the backend uses an agent runtime layer with tool wrappers for policy retrieval and HR SQL, and it can persist per-session chat memory when a `session_id` is supplied.
 
 ## Repository Structure
 
@@ -97,10 +98,24 @@ Fill these values in `.env` when you are ready to use Azure:
 - `AZURE_SEARCH_ENDPOINT`
 - `AZURE_SEARCH_API_KEY`
 - `AZURE_SEARCH_INDEX_NAME`
+- `OPENAI_AGENTS_ENABLED`
+- `AGENT_MEMORY_PATH`
 
 The app uses mock retrieval/generation locally when `MOCK_AZURE_MODE=true` or when Azure credentials are missing.
 The default knowledge base path points at `data/knowledge_base`, where `hr_policy.pdf` is the expected starter document.
 The default HR database path points at `data/hr.sqlite3`.
+The default local session-memory store points at `data/agent_memory.sqlite3`.
+
+## Agentic Phase 1
+
+The current backend chat flow now runs through an agent runtime layer in `services/api/app/agents`:
+
+- `SupervisorAgent` chooses between policy and SQL tools
+- `PolicySearchTool` wraps the PDF RAG flow
+- `HRSQLTool` wraps structured HR database access
+- `AgentSessionStore` persists recent turns when `session_id` is provided
+
+The OpenAI Agents SDK dependency is included for the next migration step. For now, set `OPENAI_AGENTS_ENABLED=false` unless you are actively validating that path in your environment. The manual supervisor remains the default, and it preserves the existing `/api/chat` contract.
 
 ## Docker
 

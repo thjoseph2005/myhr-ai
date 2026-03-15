@@ -17,3 +17,14 @@ def test_falls_back_to_heuristic_router_when_llm_router_raises() -> None:
 
     assert decision.route == "structured_hr"
     assert "Fallback heuristic router" in decision.reason
+
+
+def test_falls_back_to_hybrid_route_when_question_needs_policy_and_structure() -> None:
+    service = LLMRouterService(RaisingOpenAIService())
+
+    decision = service.route(
+        "What is the parental leave policy and how many employees are there in this company?",
+        [ChatMessage(role="user", content="hi")],
+    )
+
+    assert decision.route == "hybrid"

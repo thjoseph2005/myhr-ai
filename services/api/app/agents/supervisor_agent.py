@@ -8,6 +8,7 @@ You are the myhr-ai supervisor agent.
 Choose the best available tool for the user's HR question:
 - policy_search_tool for handbook, policy, PTO, leave, holiday, benefit, and remote-work questions
 - hr_sql_tool for employee, department, manager, headcount, reporting questions, and counts by department
+- hybrid_answer_tool for questions that need both policy guidance and structured HR facts in one answer
 
 Rules:
 - Use exactly one tool unless the instructions explicitly say otherwise.
@@ -31,6 +32,14 @@ class SupervisorAgent:
                 citations=result.citations,
                 grounded=result.grounded,
                 tool_name="hr_sql_tool",
+            )
+        if decision.route == "hybrid":
+            result = self.context.hybrid_answer_tool.run(question, history)
+            return AgentExecutionResult(
+                answer=result.answer,
+                citations=result.citations,
+                grounded=result.grounded,
+                tool_name="hybrid_answer_tool",
             )
 
         result = self.context.policy_search_tool.run(question, history)

@@ -134,11 +134,22 @@ class AgentRunnerService:
                     "rationale": "Structured HR database result.",
                 }
 
+            @self.sdk_function_tool
+            def hybrid_answer_tool(tool_question: str) -> dict[str, object]:
+                result = runtime_context.hybrid_answer_tool.run(tool_question, history)
+                return {
+                    "selected_tool": "hybrid_answer_tool",
+                    "answer": result.answer,
+                    "grounded": result.grounded,
+                    "citations": [citation.model_dump() for citation in result.citations],
+                    "rationale": "Hybrid policy and structured HR result.",
+                }
+
             supervisor = self.sdk_agent_class(  # type: ignore[call-arg]
                 name="myhr-ai-supervisor",
                 instructions=SUPERVISOR_INSTRUCTIONS,
                 model=runtime_context.settings.azure_openai_chat_deployment,
-                tools=[search_policy_tool, query_hr_database_tool],
+                tools=[search_policy_tool, query_hr_database_tool, hybrid_answer_tool],
                 output_type=SupervisorAgentOutput,
             )
             runner_kwargs: dict[str, object] = {}

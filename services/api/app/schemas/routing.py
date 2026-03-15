@@ -4,5 +4,5 @@ from pydantic import BaseModel
 
 
 class RouteDecision(BaseModel):
-    route: Literal["policy_rag", "structured_hr"]
+    route: Literal["policy_rag", "structured_hr", "hybrid"]
     reason: str

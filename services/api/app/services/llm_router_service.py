@@ -11,9 +11,10 @@ Choose exactly one route for each user question.
 Routes:
 - policy_rag: Use for HR policy, PTO, leave, holidays, handbook, benefits, and remote-work policy questions.
 - structured_hr: Use for employee, manager, department, title, email, location, reporting line, headcount, counts by department, department summaries, and structured HR database questions.
+- hybrid: Use when the question needs both policy knowledge and structured HR data in the same answer.
 
 Respond with valid JSON only:
-{"route":"policy_rag|structured_hr","reason":"short explanation"}
+{"route":"policy_rag|structured_hr|hybrid","reason":"short explanation"}
 """
 
 

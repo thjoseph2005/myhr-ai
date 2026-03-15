@@ -6,9 +6,12 @@ from app.core.config import Settings
 from app.domain.models import RetrievedChunk
 from app.schemas.chat import ChatRequest
 from app.services.grounding_evaluator_service import NOT_FOUND_MESSAGE
+from app.services.hybrid_answer_service import HybridAnswerService
 from app.services.rag_service import RAGService
+from app.services.structured_answer_service import StructuredAnswerService
 from app.schemas.routing import RouteDecision
 from app.tools.hr_sql_tool import HRSQLTool
+from app.tools.hybrid_answer_tool import HybridAnswerTool
 from app.tools.policy_search_tool import PolicySearchTool
 
 
@@ -62,7 +65,13 @@ class FakeSDKRunner:
     @staticmethod
     async def run(agent, input: str, **kwargs):
         assert kwargs is not None
-        selected_tool = agent.tools[1] if "employee" in input.lower() else agent.tools[0]
+        normalized = input.lower()
+        if "policy" in normalized and "employee" in normalized:
+            selected_tool = agent.tools[2]
+        elif "employee" in normalized:
+            selected_tool = agent.tools[1]
+        else:
+            selected_tool = agent.tools[0]
         return type("Result", (), {"final_output": selected_tool(input)})()
 
 
@@ -96,12 +105,27 @@ def rebind_agent_runner(service: RAGService) -> None:
         top_k=service.settings.default_chat_top_k,
         max_history_messages=service.settings.max_history_messages,
     )
+    service.structured_answer_service = StructuredAnswerService(
+        service.answer_generation_service,
+        service.grounding_evaluator_service,
+    )
     service.hr_sql_tool = HRSQLTool(
         service.hr_database_service,
         service.sql_query_builder_service,
         service.llm_sql_planner_service,
         service.sql_tool_service,
         service.structured_answer_service,
+    )
+    service.hybrid_answer_service = HybridAnswerService(
+        service.answer_generation_service,
+        service.grounding_evaluator_service,
+        max_history_messages=service.settings.max_history_messages,
+    )
+    service.hybrid_answer_tool = HybridAnswerTool(
+        service.hybrid_question_service,
+        service.hybrid_answer_service,
+        service.policy_search_tool,
+        service.hr_sql_tool,
     )
     service.agent_runner_service = AgentRunnerService(
         AgentContext(
@@ -114,12 +138,15 @@ def rebind_agent_runner(service: RAGService) -> None:
             answer_generation_service=service.answer_generation_service,
             grounding_evaluator_service=service.grounding_evaluator_service,
             hr_database_service=service.hr_database_service,
+            hybrid_question_service=service.hybrid_question_service,
+            hybrid_answer_service=service.hybrid_answer_service,
             sql_query_builder_service=service.sql_query_builder_service,
             llm_sql_planner_service=service.llm_sql_planner_service,
             sql_tool_service=service.sql_tool_service,
             structured_answer_service=service.structured_answer_service,
             policy_search_tool=service.policy_search_tool,
             hr_sql_tool=service.hr_sql_tool,
+            hybrid_answer_tool=service.hybrid_answer_tool,
         )
     )
 
@@ -360,3 +387,48 @@ async def test_prefers_sdk_supervisor_path_when_enabled(tmp_path: Path) -> None:
         AgentRunnerService.sdk_set_api = original_set_api
         AgentRunnerService.sdk_disable_tracing = original_disable_tracing
         AgentRunnerService.sdk_async_client_class = original_async_client_class
+
+
+async def test_answers_hybrid_question_with_combined_citations(tmp_path: Path) -> None:
+    service = RAGService(
+        Settings(
+            APP_ENV="test",
+            LOG_LEVEL="INFO",
+            API_CORS_ORIGINS=["http://localhost:3000"],
+            DEFAULT_CHAT_TOP_K=3,
+            DEFAULT_CHAT_TEMPERATURE=0.1,
+            MAX_HISTORY_MESSAGES=4,
+            INDEXER_BATCH_SIZE=10,
+            KNOWLEDGE_BASE_PATH="/tmp/knowledge_base",
+            HR_DATABASE_PATH=str(tmp_path / "hr.sqlite3"),
+            AGENT_MEMORY_PATH=str(tmp_path / "agent-memory.sqlite3"),
+            MOCK_AZURE_MODE=True,
+        )
+    )
+    service.llm_router_service = FakeLLMRouterService("hybrid")
+    service.answer_generation_service = FakeOpenAIService(
+        "Parental leave is available under the handbook policy. There are 12 employees in the HR database."
+    )
+    service.retriever_service = FakeSearchService(
+        [RetrievedChunk(
+            chunk_id="hrpolicy-p20-c1",
+            document_id="hrpolicy",
+            document_name="HRPolicy.pdf",
+            page_number=20,
+            content="Eligible employees may take parental leave under the handbook policy.",
+            score=1.0,
+        )]
+    )
+    rebind_agent_runner(service)
+
+    response = await service.answer_question(
+        ChatRequest(
+            question="What is the parental leave policy and how many employees are there in this company?",
+            history=[],
+        )
+    )
+
+    assert response.grounded is True
+    assert "Parental leave" in response.answer
+    assert any(citation.document_name == "HRPolicy.pdf" for citation in response.citations)
+    assert any(citation.document_name == "HR Database" for citation in response.citations)

@@ -35,10 +35,14 @@ class IntentRouterService:
     def route(self, question: str) -> str:
         normalized = " ".join(question.lower().split())
         collapsed = normalized.replace(" ", "")
-        if any(keyword in normalized for keyword in self.POLICY_KEYWORDS):
+        policy_match = any(keyword in normalized for keyword in self.POLICY_KEYWORDS)
+        structured_match = any(keyword in normalized for keyword in self.STRUCTURED_KEYWORDS) or any(
+            keyword.replace(" ", "") in collapsed for keyword in self.STRUCTURED_KEYWORDS
+        )
+        if policy_match and structured_match:
+            return "hybrid"
+        if policy_match:
             return "policy_rag"
-        if any(keyword in normalized for keyword in self.STRUCTURED_KEYWORDS):
-            return "structured_hr"
-        if any(keyword.replace(" ", "") in collapsed for keyword in self.STRUCTURED_KEYWORDS):
+        if structured_match:
             return "structured_hr"
         return "policy_rag"

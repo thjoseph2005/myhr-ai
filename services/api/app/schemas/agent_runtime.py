@@ -6,7 +6,7 @@ from app.schemas.chat import Citation
 
 
 class SupervisorAgentOutput(BaseModel):
-    selected_tool: Literal["policy_search_tool", "hr_sql_tool"]
+    selected_tool: Literal["policy_search_tool", "hr_sql_tool", "hybrid_answer_tool"]
     answer: str = Field(min_length=1)
     grounded: bool
     citations: list[Citation] = Field(default_factory=list)

@@ -48,7 +48,7 @@ class HRSQLTool:
             )
 
         rows = self.sql_tool_service.run_query(plan)
-        answer, citations, grounded = self.structured_answer_service.build_answer(plan, rows)
+        answer, citations, grounded = self.structured_answer_service.build_answer(plan, rows, question)
         return HRSQLToolResult(
             answer=answer,
             citations=citations,

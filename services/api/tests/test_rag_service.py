@@ -52,6 +52,26 @@ class FakeLLMSQLPlannerService:
         return self.plan
 
 
+class FakeSDKAgent:
+    def __init__(self, **kwargs) -> None:
+        self.kwargs = kwargs
+        self.tools = kwargs["tools"]
+
+
+class FakeSDKRunner:
+    @staticmethod
+    async def run(agent, input: str, **kwargs):
+        assert kwargs is not None
+        selected_tool = agent.tools[1] if "employee" in input.lower() else agent.tools[0]
+        return type("Result", (), {"final_output": selected_tool(input)})()
+
+
+class FakeSDKSession:
+    def __init__(self, session_id: str, database_path: str) -> None:
+        self.session_id = session_id
+        self.database_path = database_path
+
+
 def build_settings() -> Settings:
     return Settings(
         APP_ENV="test",
@@ -268,3 +288,75 @@ async def test_uses_session_memory_when_session_id_is_provided(tmp_path: Path) -
     assert second.grounded is True
     stored_history = service.agent_runner_service.session_store.load_history("demo-session")
     assert len(stored_history) == 4
+
+
+async def test_prefers_sdk_supervisor_path_when_enabled(tmp_path: Path) -> None:
+    original_agent_class = AgentRunnerService.sdk_agent_class
+    original_runner = AgentRunnerService.sdk_runner
+    original_function_tool = AgentRunnerService.sdk_function_tool
+    original_session_class = AgentRunnerService.sdk_session_class
+    original_set_client = AgentRunnerService.sdk_set_client
+    original_set_api = AgentRunnerService.sdk_set_api
+    original_disable_tracing = AgentRunnerService.sdk_disable_tracing
+    original_async_client_class = AgentRunnerService.sdk_async_client_class
+
+    AgentRunnerService.sdk_agent_class = FakeSDKAgent
+    AgentRunnerService.sdk_runner = FakeSDKRunner
+    AgentRunnerService.sdk_function_tool = staticmethod(lambda func: func)
+    AgentRunnerService.sdk_session_class = FakeSDKSession
+    AgentRunnerService.sdk_set_client = staticmethod(lambda *args, **kwargs: None)
+    AgentRunnerService.sdk_set_api = staticmethod(lambda *args, **kwargs: None)
+    AgentRunnerService.sdk_disable_tracing = staticmethod(lambda *args, **kwargs: None)
+    AgentRunnerService.sdk_async_client_class = type(
+        "FakeAsyncClient",
+        (),
+        {"__init__": lambda self, **kwargs: None},
+    )
+
+    try:
+        service = RAGService(
+            Settings(
+                APP_ENV="test",
+                LOG_LEVEL="INFO",
+                API_CORS_ORIGINS=["http://localhost:3000"],
+                DEFAULT_CHAT_TOP_K=3,
+                DEFAULT_CHAT_TEMPERATURE=0.1,
+                MAX_HISTORY_MESSAGES=4,
+                INDEXER_BATCH_SIZE=10,
+                KNOWLEDGE_BASE_PATH="/tmp/knowledge_base",
+                HR_DATABASE_PATH=str(tmp_path / "hr.sqlite3"),
+                AGENT_MEMORY_PATH=str(tmp_path / "agent-memory.sqlite3"),
+                OPENAI_AGENTS_ENABLED=True,
+                MOCK_AZURE_MODE=False,
+                AZURE_OPENAI_ENDPOINT="https://example.openai.azure.com",
+                AZURE_OPENAI_API_KEY="key",
+                AZURE_OPENAI_CHAT_DEPLOYMENT="chat-deployment",
+                AZURE_OPENAI_EMBEDDING_DEPLOYMENT="embedding-deployment",
+                AZURE_SEARCH_ENDPOINT="https://example.search.windows.net",
+                AZURE_SEARCH_API_KEY="search-key",
+                AZURE_SEARCH_INDEX_NAME="hr-policy-index",
+            )
+        )
+        service.llm_router_service = FakeLLMRouterService("policy_rag")
+        rebind_agent_runner(service)
+
+        response = await service.answer_question(
+            ChatRequest(
+                question="How many employees are there in the company?",
+                history=[],
+                session_id="sdk-session",
+            )
+        )
+
+        assert response.grounded is True
+        assert "employees in the HR database" in response.answer
+        assert response.citations[0].document_name == "HR Database"
+    finally:
+        AgentRunnerService.sdk_agent_class = original_agent_class
+        AgentRunnerService.sdk_runner = original_runner
+        AgentRunnerService.sdk_function_tool = original_function_tool
+        AgentRunnerService.sdk_session_class = original_session_class
+        AgentRunnerService.sdk_set_client = original_set_client
+        AgentRunnerService.sdk_set_api = original_set_api
+        AgentRunnerService.sdk_disable_tracing = original_disable_tracing
+        AgentRunnerService.sdk_async_client_class = original_async_client_class

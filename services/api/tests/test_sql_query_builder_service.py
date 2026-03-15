@@ -11,6 +11,16 @@ def test_builds_total_employee_count_query() -> None:
     assert plan.parameters == []
 
 
+def test_builds_total_employee_count_query_from_company_question() -> None:
+    service = SQLQueryBuilderService()
+
+    plan = service.build("How many employees are there in this company?")
+
+    assert plan is not None
+    assert plan.intent == "total_employee_count"
+    assert plan.parameters == []
+
+
 def test_builds_total_department_count_query() -> None:
     service = SQLQueryBuilderService()
 

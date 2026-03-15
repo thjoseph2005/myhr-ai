@@ -15,17 +15,14 @@ class SQLQueryBuilderService:
         normalized = " ".join(question.lower().split())
         collapsed = normalized.replace(" ", "")
 
+        if self._is_total_employee_count_question(normalized, collapsed):
+            return self._total_employee_count()
         if self._is_total_department_count_question(normalized, collapsed):
             return self._total_department_count()
         if self._is_department_headcount_summary_question(normalized, collapsed):
             return self._department_headcount_summary()
 
         patterns: list[tuple[str, str, callable]] = [
-            (
-                "total_employee_count",
-                r"(?:get|what is|show|give me)? ?(?:the )?(?:(?:total )?(?:count of )|(?:total count of )|(?:number of )|(?:total number of ))employees?$",
-                lambda _: self._total_employee_count(),
-            ),
             (
                 "department_headcount",
                 r"how many .*?(?:in|are in) (?:the )?([a-z &]+?)(?: department)?$",
@@ -114,6 +111,22 @@ class SQLQueryBuilderService:
             ),
             parameters=[],
             description="Employee count by department",
+        )
+
+    @staticmethod
+    def _is_total_employee_count_question(normalized: str, collapsed: str) -> bool:
+        natural_patterns = [
+            r"(?:get|what is|show|give me)? ?(?:the )?(?:(?:total )?(?:count of )|(?:total count of )|(?:number of )|(?:total number of ))employees?\??$",
+            r"how many employees (?:are there|do we have|exist)(?: in (?:the|this) company)?\??$",
+            r"(?:what is|show|give me)? ?(?:the )?company headcount\??$",
+        ]
+        collapsed_patterns = [
+            r"howmanyemployees(?:arethere|dowehave|exist)(?:inthecompany|inthiscompany)?\??$",
+            r"(?:whatis|show|giveme)?(?:the)?companyheadcount\??$",
+        ]
+
+        return any(re.search(pattern, normalized, flags=re.IGNORECASE) for pattern in natural_patterns) or any(
+            re.search(pattern, collapsed, flags=re.IGNORECASE) for pattern in collapsed_patterns
         )
 
     @staticmethod

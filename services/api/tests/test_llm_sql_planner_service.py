@@ -73,3 +73,19 @@ def test_returns_none_when_llm_sql_planner_raises(tmp_path: Path) -> None:
     plan = planner.build("How many departments are there?")
 
     assert plan is None
+
+
+def test_builds_company_managers_plan_from_llm_json(tmp_path: Path) -> None:
+    hr_database_service = HRDatabaseService(build_settings(tmp_path))
+    planner = LLMSQLPlannerService(
+        FakeOpenAIService(
+            '{"intent":"company_managers","sql":"SELECT DISTINCT manager.employee_id, manager.first_name || \' \' || manager.last_name AS manager_name, manager.title, d.name AS department_name FROM employees e JOIN employees manager ON e.manager_id = manager.employee_id LEFT JOIN departments d ON manager.department_id = d.department_id ORDER BY manager.last_name, manager.first_name","parameters":[],"description":"Managers in the company"}'
+        ),
+        hr_database_service,
+    )
+
+    plan = planner.build("Who are the managers of this company?")
+
+    assert plan is not None
+    assert plan.intent == "company_managers"
+    assert "DISTINCT" in plan.sql

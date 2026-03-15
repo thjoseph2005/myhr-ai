@@ -106,16 +106,16 @@ export function ChatShell() {
   return (
     <div className="min-h-screen bg-app-shell text-ink">
       <div className="mx-auto grid min-h-screen max-w-[1600px] grid-cols-1 lg:grid-cols-[292px_minmax(0,1fr)]">
-        <aside className="border-b border-navy-900/20 bg-navy-950 px-6 py-8 text-white lg:border-b-0 lg:border-r lg:border-r-navy-900/20">
+        <aside className="border-b border-line/80 bg-panel px-6 py-8 text-navy-950 lg:border-b-0 lg:border-r lg:border-r-line/80">
           <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.08]">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-line/80 bg-white">
               <SearchCheck className="h-5 w-5 text-accent-500" />
             </div>
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-navy-200">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-navy-600">
                 myhr-ai
               </p>
-              <h1 className="mt-1 text-xl font-semibold tracking-tight text-white">
+              <h1 className="mt-1 text-xl font-semibold tracking-tight text-navy-950">
                 HR Policy Assistant
               </h1>
             </div>
@@ -129,8 +129,8 @@ export function ChatShell() {
             statusError={statusError}
           />
 
-          <section className="mt-6 rounded-[28px] border border-white/10 bg-white/[0.04] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-navy-200">
+          <section className="mt-6 rounded-[28px] border border-line/80 bg-white p-5 shadow-card">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-navy-600">
               Suggested Questions
             </p>
             <div className="mt-4 space-y-3">
@@ -139,7 +139,7 @@ export function ChatShell() {
                   key={question}
                   type="button"
                   onClick={() => setInput(question)}
-                  className="w-full rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-left text-sm leading-6 text-white transition hover:bg-white/[0.08]"
+                  className="w-full rounded-2xl border border-line/80 bg-panel px-4 py-3 text-left text-sm leading-6 text-navy-950 transition hover:bg-white"
                 >
                   {question}
                 </button>

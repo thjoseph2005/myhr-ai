@@ -3,7 +3,7 @@
 `myhr-ai` is a monorepo starter for an HR policy assistant that answers questions from a repository-managed knowledge base. PDFs live in `data/knowledge_base/`, the FastAPI backend indexes them for RAG, and the Next.js frontend provides a ChatGPT-like enterprise chat experience with citations.
 
 The backend also supports a lightweight SQLite HR database for employee and department lookups, so the chat can answer structured HR questions alongside policy questions.
-Phase 2 of the agentic migration is now in place: the backend uses an agent runtime layer with tool wrappers for policy retrieval and HR SQL, and it can persist per-session chat memory when a `session_id` is supplied.
+Phase 4 of the agentic migration is now in place: the backend uses an agent runtime layer with tool wrappers for policy retrieval and HR SQL, hybrid reasoning, persisted session memory, agent traces, and reliability fallbacks such as SQL repair.
 
 ## Repository Structure
 
@@ -106,14 +106,17 @@ The default knowledge base path points at `data/knowledge_base`, where `hr_polic
 The default HR database path points at `data/hr.sqlite3`.
 The default local session-memory store points at `data/agent_memory.sqlite3`.
 
-## Agentic Phase 2
+## Agentic Phase 4
 
 The current backend chat flow now runs through an agent runtime layer in `services/api/app/agents`:
 
-- `SupervisorAgent` chooses between policy and SQL tools
+- `SupervisorAgent` delegates to specialized policy, HR data, and hybrid agents
 - `PolicySearchTool` wraps the PDF RAG flow
 - `HRSQLTool` wraps structured HR database access
-- `AgentSessionStore` persists recent turns when `session_id` is provided
+- `HybridAnswerTool` combines policy and structured HR evidence in one answer
+- `AgentSessionStore` persists recent turns, summaries, remembered facts, and agent traces
+- `AgentMemoryManager` refreshes long-term memory for each session
+- `LLMSQLRepairService` can repair one bad SQL plan before the request fails
 
 When `OPENAI_AGENTS_ENABLED=true` and Azure is configured, the backend now prefers the OpenAI Agents SDK supervisor path with SDK-managed tool selection and SQLite-backed sessions. If the SDK path is unavailable or errors, the manual supervisor remains as the resilience fallback, and the `/api/chat` contract stays unchanged.
 

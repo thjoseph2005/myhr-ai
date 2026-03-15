@@ -23,6 +23,8 @@ class AgentContext:
     settings: Settings
     request_id: str
     session_id: str | None
+    memory_summary: str | None
+    remembered_facts: dict[str, str]
     llm_router_service: LLMRouterService
     retriever_service: RetrieverService
     prompt_builder_service: PromptBuilderService

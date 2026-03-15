@@ -49,8 +49,10 @@ class FakeLLMRouterService:
 class FakeLLMSQLPlannerService:
     def __init__(self, plan) -> None:
         self.plan = plan
+        self.calls: list[str] = []
 
     def build(self, question: str):
+        self.calls.append(question)
         assert question
         return self.plan
 
@@ -113,6 +115,7 @@ def rebind_agent_runner(service: RAGService) -> None:
         service.hr_database_service,
         service.sql_query_builder_service,
         service.llm_sql_planner_service,
+        service.llm_sql_repair_service,
         service.sql_tool_service,
         service.structured_answer_service,
     )
@@ -132,6 +135,8 @@ def rebind_agent_runner(service: RAGService) -> None:
             settings=service.settings,
             request_id="test",
             session_id=None,
+            memory_summary=None,
+            remembered_facts={},
             llm_router_service=service.llm_router_service,
             retriever_service=service.retriever_service,
             prompt_builder_service=service.prompt_builder_service,
@@ -267,6 +272,52 @@ async def test_uses_llm_sql_planner_when_rule_planner_has_no_match(tmp_path: Pat
     assert response.citations[0].document_name == "HR Database"
 
 
+async def test_prefers_llm_sql_planner_when_azure_is_enabled(tmp_path: Path) -> None:
+    service = RAGService(
+        Settings(
+            APP_ENV="test",
+            LOG_LEVEL="INFO",
+            API_CORS_ORIGINS=["http://localhost:3000"],
+            DEFAULT_CHAT_TOP_K=3,
+            DEFAULT_CHAT_TEMPERATURE=0.1,
+            MAX_HISTORY_MESSAGES=4,
+            INDEXER_BATCH_SIZE=10,
+            KNOWLEDGE_BASE_PATH="/tmp/knowledge_base",
+            HR_DATABASE_PATH=str(tmp_path / "hr.sqlite3"),
+            MOCK_AZURE_MODE=False,
+            AZURE_OPENAI_ENDPOINT="https://example.openai.azure.com",
+            AZURE_OPENAI_API_KEY="key",
+            AZURE_OPENAI_CHAT_DEPLOYMENT="chat-deployment",
+            AZURE_OPENAI_EMBEDDING_DEPLOYMENT="embedding-deployment",
+            AZURE_SEARCH_ENDPOINT="https://example.search.windows.net",
+            AZURE_SEARCH_API_KEY="search-key",
+            AZURE_SEARCH_INDEX_NAME="hr-policy-index",
+        )
+    )
+    service.llm_router_service = FakeLLMRouterService("structured_hr")
+    fake_planner = FakeLLMSQLPlannerService(
+        type(
+            "Plan",
+            (),
+            {
+                "intent": "company_headcount",
+                "sql": "SELECT COUNT(*) AS employee_count FROM employees",
+                "parameters": [],
+                "description": "Company headcount",
+            },
+        )()
+    )
+    service.llm_sql_planner_service = fake_planner
+    rebind_agent_runner(service)
+
+    response = await service.answer_question(
+        ChatRequest(question="How many employees are there in this company?", history=[])
+    )
+
+    assert response.grounded is True
+    assert fake_planner.calls == ["How many employees are there in this company?"]
+
+
 async def test_uses_session_memory_when_session_id_is_provided(tmp_path: Path) -> None:
     service = RAGService(
         Settings(
@@ -315,6 +366,9 @@ async def test_uses_session_memory_when_session_id_is_provided(tmp_path: Path) -
     assert second.grounded is True
     stored_history = service.agent_runner_service.session_store.load_history("demo-session")
     assert len(stored_history) == 4
+    assert service.agent_runner_service.session_store.load_summary("demo-session") is not None
+    remembered_facts = service.agent_runner_service.session_store.load_facts("demo-session")
+    assert "last_user_question" in remembered_facts
 
 
 async def test_prefers_sdk_supervisor_path_when_enabled(tmp_path: Path) -> None:

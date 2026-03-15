@@ -10,6 +10,7 @@ from app.services.grounding_evaluator_service import GroundingEvaluatorService
 from app.services.hr_database_service import HRDatabaseService
 from app.services.hybrid_answer_service import HybridAnswerService
 from app.services.hybrid_question_service import HybridQuestionService
+from app.services.llm_sql_repair_service import LLMSQLRepairService
 from app.services.llm_router_service import LLMRouterService
 from app.services.llm_sql_planner_service import LLMSQLPlannerService
 from app.services.openai_service import OpenAIService
@@ -47,6 +48,7 @@ class RAGService:
             self.openai_service,
             self.hr_database_service,
         )
+        self.llm_sql_repair_service = LLMSQLRepairService(self.openai_service)
         self.sql_tool_service = SQLToolService(self.hr_database_service)
         self.structured_answer_service = StructuredAnswerService(
             self.answer_generation_service,
@@ -64,6 +66,7 @@ class RAGService:
             self.hr_database_service,
             self.sql_query_builder_service,
             self.llm_sql_planner_service,
+            self.llm_sql_repair_service,
             self.sql_tool_service,
             self.structured_answer_service,
         )
@@ -78,6 +81,8 @@ class RAGService:
                 settings=self.settings,
                 request_id="bootstrap",
                 session_id=None,
+                memory_summary=None,
+                remembered_facts={},
                 llm_router_service=self.llm_router_service,
                 retriever_service=self.retriever_service,
                 prompt_builder_service=self.prompt_builder_service,

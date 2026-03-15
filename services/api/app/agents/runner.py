@@ -6,6 +6,7 @@ from uuid import uuid4
 from openai import AsyncOpenAI
 
 from app.agents.context import AgentContext
+from app.agents.memory_manager import AgentMemoryManager
 from app.agents.models import AgentExecutionResult
 from app.agents.session_store import AgentSessionStore
 from app.agents.supervisor_agent import SUPERVISOR_INSTRUCTIONS, SupervisorAgent
@@ -49,18 +50,41 @@ class AgentRunnerService:
             context.settings.agent_memory_path,
             max_messages=context.settings.max_history_messages,
         )
+        self.memory_manager = AgentMemoryManager(context.answer_generation_service)
 
     async def run_chat(self, payload: ChatRequest) -> ChatResponse:
-        history = self._resolve_history(payload)
         session_id = payload.session_id
+        memory_summary = self.session_store.load_summary(session_id) if session_id else None
+        remembered_facts = self.session_store.load_facts(session_id) if session_id else {}
+        history = self._resolve_history(payload, memory_summary, remembered_facts)
         runtime_context = replace(
             self.context,
             request_id=str(uuid4()),
             session_id=session_id,
+            memory_summary=memory_summary,
+            remembered_facts=remembered_facts,
         )
+        route = runtime_context.llm_router_service.route(payload.question, history)
         result = await self._run_agent(payload.question, history, runtime_context)
         if session_id:
             self.session_store.append_turn(session_id, payload.question, result.answer)
+            recent_history = self.session_store.load_history(session_id)
+            summary, facts = self.memory_manager.update_memory(
+                memory_summary,
+                remembered_facts,
+                recent_history,
+            )
+            self.session_store.store_summary(session_id, summary)
+            self.session_store.store_facts(session_id, facts)
+        self.session_store.append_trace(
+            request_id=runtime_context.request_id,
+            session_id=session_id,
+            runtime_mode="sdk" if runtime_context.settings.openai_agents_enabled else "manual",
+            route=route.route,
+            tool_name=result.tool_name,
+            grounded=result.grounded,
+            note=route.reason,
+        )
         return ChatResponse(
             answer=result.answer,
             citations=result.citations,
@@ -203,13 +227,29 @@ class AgentRunnerService:
                 return None
         return None
 
-    def _resolve_history(self, payload: ChatRequest) -> list[ChatMessage]:
+    def _resolve_history(
+        self,
+        payload: ChatRequest,
+        memory_summary: str | None,
+        remembered_facts: dict[str, str],
+    ) -> list[ChatMessage]:
+        memory_messages: list[ChatMessage] = []
+        if memory_summary:
+            facts_block = ""
+            if remembered_facts:
+                facts_block = "\n".join(f"- {key}: {value}" for key, value in remembered_facts.items())
+            content = f"Conversation memory summary: {memory_summary}"
+            if facts_block:
+                content += f"\nRemembered facts:\n{facts_block}"
+            memory_messages.append(ChatMessage(role="assistant", content=content))
         if payload.session_id:
             stored_history = self.session_store.load_history(payload.session_id)
             if stored_history and not payload.history:
-                return stored_history[-self.context.settings.max_history_messages :]
+                merged = [*memory_messages, *stored_history]
+                return merged[-self.context.settings.max_history_messages :]
             if stored_history:
-                merged = [*stored_history, *payload.history]
+                merged = [*memory_messages, *stored_history, *payload.history]
                 return merged[-self.context.settings.max_history_messages :]
 
-        return payload.history[-self.context.settings.max_history_messages :]
+        merged = [*memory_messages, *payload.history]
+        return merged[-self.context.settings.max_history_messages :]

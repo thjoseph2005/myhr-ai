@@ -1,5 +1,8 @@
 from app.agents.context import AgentContext
+from app.agents.hr_data_agent import HRDataAgent
+from app.agents.hybrid_agent import HybridAgent
 from app.agents.models import AgentExecutionResult
+from app.agents.policy_agent import PolicyAgent
 from app.schemas.chat import ChatMessage
 
 SUPERVISOR_INSTRUCTIONS = """
@@ -22,30 +25,15 @@ I could not find this in the HR policy document.
 class SupervisorAgent:
     def __init__(self, context: AgentContext) -> None:
         self.context = context
+        self.policy_agent = PolicyAgent(context)
+        self.hr_data_agent = HRDataAgent(context)
+        self.hybrid_agent = HybridAgent(context)
 
     def run(self, question: str, history: list[ChatMessage]) -> AgentExecutionResult:
         decision = self.context.llm_router_service.route(question, history)
         if decision.route == "structured_hr":
-            result = self.context.hr_sql_tool.run(question)
-            return AgentExecutionResult(
-                answer=result.answer,
-                citations=result.citations,
-                grounded=result.grounded,
-                tool_name="hr_sql_tool",
-            )
+            return self.hr_data_agent.run(question)
         if decision.route == "hybrid":
-            result = self.context.hybrid_answer_tool.run(question, history)
-            return AgentExecutionResult(
-                answer=result.answer,
-                citations=result.citations,
-                grounded=result.grounded,
-                tool_name="hybrid_answer_tool",
-            )
+            return self.hybrid_agent.run(question, history)
 
-        result = self.context.policy_search_tool.run(question, history)
-        return AgentExecutionResult(
-            answer=result.answer,
-            citations=result.citations,
-            grounded=result.grounded,
-            tool_name="policy_search_tool",
-        )
+        return self.policy_agent.run(question, history)

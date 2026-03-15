@@ -13,6 +13,12 @@ class SQLQueryPlan:
 class SQLQueryBuilderService:
     def build(self, question: str) -> SQLQueryPlan | None:
         normalized = " ".join(question.lower().split())
+        collapsed = normalized.replace(" ", "")
+
+        if self._is_total_department_count_question(normalized, collapsed):
+            return self._total_department_count()
+        if self._is_department_headcount_summary_question(normalized, collapsed):
+            return self._department_headcount_summary()
 
         patterns: list[tuple[str, str, callable]] = [
             (
@@ -86,6 +92,61 @@ class SQLQueryBuilderService:
             sql="SELECT COUNT(*) AS employee_count FROM employees",
             parameters=[],
             description="Total employee count",
+        )
+
+    def _total_department_count(self) -> SQLQueryPlan:
+        return SQLQueryPlan(
+            intent="total_department_count",
+            sql="SELECT COUNT(*) AS department_count FROM departments",
+            parameters=[],
+            description="Total department count",
+        )
+
+    def _department_headcount_summary(self) -> SQLQueryPlan:
+        return SQLQueryPlan(
+            intent="department_headcount_summary",
+            sql=(
+                "SELECT d.name AS department_name, COUNT(e.employee_id) AS employee_count "
+                "FROM departments d "
+                "LEFT JOIN employees e ON e.department_id = d.department_id "
+                "GROUP BY d.department_id, d.name "
+                "ORDER BY d.name"
+            ),
+            parameters=[],
+            description="Employee count by department",
+        )
+
+    @staticmethod
+    def _is_total_department_count_question(normalized: str, collapsed: str) -> bool:
+        natural_patterns = [
+            r"(?:get|what is|show|give me)? ?(?:the )?(?:(?:total )?(?:count of )|(?:total count of )|(?:number of )|(?:total number of ))departments?\??$",
+            r"how many departments (?:are there|do we have|exist|in the company)?\??$",
+        ]
+        collapsed_patterns = [
+            r"howmanydepartments(?:arethere|dowehave|exist|inthecompany)?\??$",
+        ]
+
+        return any(re.search(pattern, normalized, flags=re.IGNORECASE) for pattern in natural_patterns) or any(
+            re.search(pattern, collapsed, flags=re.IGNORECASE) for pattern in collapsed_patterns
+        )
+
+    @staticmethod
+    def _is_department_headcount_summary_question(normalized: str, collapsed: str) -> bool:
+        natural_patterns = [
+            r"(?:give me|show|what is|what are|list)? ?(?:the )?(?:count|counts|headcount|headcounts|number) of employees by departments?\??$",
+            r"(?:give me|show|what is|what are|list)? ?employees by departments?\??$",
+            r"(?:give me|show|what is|what are|list)? ?(?:department|departments) (?:employee )?(?:count|counts|headcount|headcounts|summary|breakdown)\??$",
+            r"(?:give me|show|what is|what are|list)? ?(?:employee )?(?:count|counts|headcount|headcounts) by departments?\??$",
+        ]
+        collapsed_patterns = [
+            r"(?:giveme|show|whatis|whatare|list)?(?:the)?(?:count|counts|headcount|headcounts|number)ofemployeesbydepartments?\??$",
+            r"(?:giveme|show|whatis|whatare|list)?employeesbydepartments?\??$",
+            r"(?:giveme|show|whatis|whatare|list)?departments(?:employee)?(?:count|counts|headcount|headcounts|summary|breakdown)\??$",
+            r"(?:giveme|show|whatis|whatare|list)?(?:employee)?(?:count|counts|headcount|headcounts)bydepartments?\??$",
+        ]
+
+        return any(re.search(pattern, normalized, flags=re.IGNORECASE) for pattern in natural_patterns) or any(
+            re.search(pattern, collapsed, flags=re.IGNORECASE) for pattern in collapsed_patterns
         )
 
     def _department_members(self, department: str) -> SQLQueryPlan:

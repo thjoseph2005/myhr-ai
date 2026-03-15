@@ -33,9 +33,12 @@ class IntentRouterService:
     ]
 
     def route(self, question: str) -> str:
-        normalized = question.lower()
+        normalized = " ".join(question.lower().split())
+        collapsed = normalized.replace(" ", "")
         if any(keyword in normalized for keyword in self.POLICY_KEYWORDS):
             return "policy_rag"
         if any(keyword in normalized for keyword in self.STRUCTURED_KEYWORDS):
+            return "structured_hr"
+        if any(keyword.replace(" ", "") in collapsed for keyword in self.STRUCTURED_KEYWORDS):
             return "structured_hr"
         return "policy_rag"

@@ -11,6 +11,46 @@ def test_builds_total_employee_count_query() -> None:
     assert plan.parameters == []
 
 
+def test_builds_total_department_count_query() -> None:
+    service = SQLQueryBuilderService()
+
+    plan = service.build("get total count of departments")
+
+    assert plan is not None
+    assert plan.intent == "total_department_count"
+    assert plan.parameters == []
+
+
+def test_builds_total_department_count_query_from_natural_question() -> None:
+    service = SQLQueryBuilderService()
+
+    plan = service.build("How many departments are there?")
+
+    assert plan is not None
+    assert plan.intent == "total_department_count"
+    assert plan.parameters == []
+
+
+def test_builds_total_department_count_query_from_split_word_question() -> None:
+    service = SQLQueryBuilderService()
+
+    plan = service.build("How many depart ments are there?")
+
+    assert plan is not None
+    assert plan.intent == "total_department_count"
+    assert plan.parameters == []
+
+
+def test_builds_department_headcount_summary_query() -> None:
+    service = SQLQueryBuilderService()
+
+    plan = service.build("Give me the count of employees by department")
+
+    assert plan is not None
+    assert plan.intent == "department_headcount_summary"
+    assert plan.parameters == []
+
+
 def test_builds_department_members_query() -> None:
     service = SQLQueryBuilderService()
 

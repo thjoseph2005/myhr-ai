@@ -8,6 +8,7 @@ from app.services.embedding_service import EmbeddingService
 from app.services.grounding_evaluator_service import GroundingEvaluatorService, NOT_FOUND_MESSAGE
 from app.services.hr_database_service import HRDatabaseService
 from app.services.llm_router_service import LLMRouterService
+from app.services.llm_sql_planner_service import LLMSQLPlannerService
 from app.services.openai_service import OpenAIService
 from app.services.prompt_builder_service import PromptBuilderService
 from app.services.retriever_service import RetrieverService
@@ -30,6 +31,10 @@ class RAGService:
         self.llm_router_service = LLMRouterService(self.openai_service)
         self.hr_database_service = HRDatabaseService(settings)
         self.sql_query_builder_service = SQLQueryBuilderService()
+        self.llm_sql_planner_service = LLMSQLPlannerService(
+            self.openai_service,
+            self.hr_database_service,
+        )
         self.sql_tool_service = SQLToolService(self.hr_database_service)
         self.structured_answer_service = StructuredAnswerService()
 
@@ -67,6 +72,8 @@ class RAGService:
     def _answer_structured_question(self, payload: ChatRequest) -> ChatResponse:
         self.hr_database_service.ensure_database()
         plan = self.sql_query_builder_service.build(payload.question)
+        if plan is None:
+            plan = self.llm_sql_planner_service.build(payload.question)
         if plan is None:
             return ChatResponse(answer=NOT_FOUND_MESSAGE, citations=[], grounded=False)
 

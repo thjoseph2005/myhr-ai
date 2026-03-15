@@ -25,6 +25,10 @@ class StructuredAnswerService:
         return answer, citations, True
 
     def _format_answer(self, plan: SQLQueryPlan, rows: list[dict[str, object]]) -> str:
+        if plan.intent == "total_department_count":
+            row = rows[0]
+            return f"There are {row['department_count']} departments in the HR database."
+
         if plan.intent == "total_employee_count":
             row = rows[0]
             return f"There are {row['employee_count']} employees in the HR database."
@@ -38,6 +42,12 @@ class StructuredAnswerService:
         if plan.intent == "department_headcount":
             row = rows[0]
             return f"{row['department_name']} has {row['employee_count']} employees in the HR database."
+
+        if plan.intent == "department_headcount_summary":
+            breakdown = ", ".join(
+                f"{row['department_name']}: {row['employee_count']}" for row in rows
+            )
+            return f"Employee count by department: {breakdown}."
 
         if plan.intent == "department_leader":
             row = rows[0]

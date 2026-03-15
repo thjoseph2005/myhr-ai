@@ -4,14 +4,16 @@
 
 :root {
   color-scheme: light;
-  --background: #f3f5f8;
+  --background: #f4f6f9;
   --foreground: #102038;
   --surface: #ffffff;
-  --surface-muted: #eef2f6;
-  --border: #d7dee8;
+  --surface-muted: #edf2f7;
+  --surface-subtle: #e6edf5;
+  --border: #d6deea;
   --navy-950: #0b1d34;
   --navy-900: #122b4a;
-  --navy-700: #35506f;
+  --navy-800: #203b5c;
+  --navy-700: #3c5878;
   --red-accent: #bf2d34;
 }
 
@@ -24,7 +26,10 @@ body {
   min-height: 100vh;
   color: var(--foreground);
   background: var(--background);
+  font-family: "Avenir Next", Avenir, "Segoe UI", sans-serif;
   font-feature-settings: "rlig" 1, "calt" 1;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 * {
@@ -38,21 +43,7 @@ body {
 
 .bg-app-shell {
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.65), rgba(255, 255, 255, 0.65)),
-    var(--background);
-}
-
-body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  background:
-    linear-gradient(to right, rgba(17, 38, 64, 0.035) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(17, 38, 64, 0.035) 1px, transparent 1px);
-  background-size: 48px 48px;
-  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.2), transparent 70%);
-  opacity: 0.35;
+    linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
 }
 
 button,

@@ -106,16 +106,16 @@ export function ChatShell() {
   return (
     <div className="min-h-screen bg-app-shell text-ink">
       <div className="mx-auto grid min-h-screen max-w-[1600px] grid-cols-1 lg:grid-cols-[292px_minmax(0,1fr)]">
-        <aside className="border-b border-line/80 bg-panel px-6 py-8 text-black lg:border-b-0 lg:border-r">
+        <aside className="border-b border-navy-900/20 bg-navy-950 px-6 py-8 text-white lg:border-b-0 lg:border-r lg:border-r-navy-900/20">
           <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-line/80 bg-white">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.08]">
               <SearchCheck className="h-5 w-5 text-accent-500" />
             </div>
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-navy-500">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-navy-200">
                 myhr-ai
               </p>
-              <h1 className="mt-1 text-xl font-semibold tracking-tight text-navy-950">
+              <h1 className="mt-1 text-xl font-semibold tracking-tight text-white">
                 HR Policy Assistant
               </h1>
             </div>
@@ -129,8 +129,8 @@ export function ChatShell() {
             statusError={statusError}
           />
 
-          <section className="mt-6 rounded-[28px] border border-line/80 bg-white p-5 shadow-[0_8px_24px_rgba(14,30,56,0.05)]">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-navy-500">
+          <section className="mt-6 rounded-[28px] border border-white/10 bg-white/[0.04] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-navy-200">
               Suggested Questions
             </p>
             <div className="mt-4 space-y-3">
@@ -139,7 +139,7 @@ export function ChatShell() {
                   key={question}
                   type="button"
                   onClick={() => setInput(question)}
-                  className="w-full rounded-2xl border border-line/80 bg-panel px-4 py-3 text-left text-sm leading-6 text-navy-900 transition hover:bg-white"
+                  className="w-full rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-left text-sm leading-6 text-white transition hover:bg-white/[0.08]"
                 >
                   {question}
                 </button>
@@ -149,7 +149,7 @@ export function ChatShell() {
         </aside>
 
         <section className="flex min-h-screen flex-col">
-          <header className="sticky top-0 z-10 border-b border-line/80 bg-white/96 px-5 py-5 backdrop-blur md:px-8">
+          <header className="sticky top-0 z-10 border-b border-line/80 bg-white/95 px-5 py-5 backdrop-blur md:px-8">
             <div className="flex items-center justify-between gap-4">
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-accent-500">
@@ -159,7 +159,7 @@ export function ChatShell() {
                   Ask grounded questions about your indexed HR policy documents
                 </h2>
               </div>
-              <div className="hidden items-center gap-2 rounded-full border border-line bg-panel px-4 py-2 text-sm text-navy-700 md:flex">
+              <div className="hidden items-center gap-2 rounded-full border border-line/80 bg-white px-4 py-2 text-sm text-navy-700 shadow-sm md:flex">
                 <ShieldCheck className="h-4 w-4 text-accent-500" />
                 Citations on every supported answer
               </div>
@@ -216,11 +216,11 @@ export function ChatShell() {
             )}
           </div>
 
-          <div className="fixed bottom-0 left-0 right-0 border-t border-line/80 bg-white/98 px-4 py-4 backdrop-blur lg:left-[292px]">
+          <div className="fixed bottom-0 left-0 right-0 border-t border-line/80 bg-white/95 px-4 py-4 backdrop-blur lg:left-[292px]">
             <form onSubmit={handleSubmit} className="mx-auto max-w-4xl">
               <div className="rounded-[30px] border border-line/80 bg-white px-4 py-4 shadow-[0_18px_40px_rgba(14,30,56,0.08)]">
                 <div className="flex items-end gap-3">
-                  <div className="flex-1 rounded-[24px] bg-panel px-4 py-3">
+                  <div className="flex-1 rounded-[24px] border border-line/70 bg-panel px-4 py-3">
                     <label htmlFor="question" className="sr-only">
                       Ask a question about the HR policy
                     </label>

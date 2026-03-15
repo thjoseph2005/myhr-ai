@@ -39,6 +39,20 @@ class OpenAIService:
         content = response.choices[0].message.content
         return content.strip() if content else ""
 
+    def generate_json(self, messages: list[dict[str, str]]) -> str:
+        if not self.settings.azure_enabled:
+            return '{"route":"policy_rag","reason":"Mock mode fallback."}'
+
+        assert self.client is not None
+        response = self.client.chat.completions.create(
+            model=self.settings.azure_openai_chat_deployment,
+            temperature=0,
+            response_format={"type": "json_object"},
+            messages=messages,
+        )
+        content = response.choices[0].message.content
+        return content.strip() if content else "{}"
+
     @staticmethod
     def _mock_embedding(text: str, dimensions: int = 12) -> list[float]:
         digest = hashlib.sha256(text.encode("utf-8")).digest()

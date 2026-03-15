@@ -5,6 +5,7 @@ from app.domain.models import RetrievedChunk
 from app.schemas.chat import ChatRequest
 from app.services.grounding_evaluator_service import NOT_FOUND_MESSAGE
 from app.services.rag_service import RAGService
+from app.schemas.routing import RouteDecision
 
 
 class FakeOpenAIService:
@@ -28,6 +29,16 @@ class FakeSearchService:
         return self.chunks
 
 
+class FakeLLMRouterService:
+    def __init__(self, route: str) -> None:
+        self.route_value = route
+
+    def route(self, question: str, history: list[object]) -> RouteDecision:
+        assert question
+        assert isinstance(history, list)
+        return RouteDecision(route=self.route_value, reason="test")
+
+
 def build_settings() -> Settings:
     return Settings(
         APP_ENV="test",
@@ -44,6 +55,7 @@ def build_settings() -> Settings:
 
 async def test_returns_grounded_answer_with_citations() -> None:
     service = RAGService(build_settings())
+    service.llm_router_service = FakeLLMRouterService("policy_rag")
     service.answer_generation_service = FakeOpenAIService("Employees receive 15 vacation days per year.")
     service.retriever_service = FakeSearchService(
         [RetrievedChunk(
@@ -67,6 +79,7 @@ async def test_returns_grounded_answer_with_citations() -> None:
 
 async def test_returns_exact_not_found_message_when_answer_is_unsupported() -> None:
     service = RAGService(build_settings())
+    service.llm_router_service = FakeLLMRouterService("policy_rag")
     service.answer_generation_service = FakeOpenAIService(NOT_FOUND_MESSAGE)
     service.retriever_service = FakeSearchService(
         [RetrievedChunk(
@@ -103,6 +116,7 @@ async def test_routes_structured_hr_question_to_sql_path(tmp_path: Path) -> None
             MOCK_AZURE_MODE=True,
         )
     )
+    service.llm_router_service = FakeLLMRouterService("structured_hr")
 
     response = await service.answer_question(
         ChatRequest(question="Who is in the Finance department?", history=[])

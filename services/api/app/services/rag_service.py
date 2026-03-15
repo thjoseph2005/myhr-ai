@@ -7,7 +7,7 @@ from app.services.answer_generation_service import AnswerGenerationService
 from app.services.embedding_service import EmbeddingService
 from app.services.grounding_evaluator_service import GroundingEvaluatorService, NOT_FOUND_MESSAGE
 from app.services.hr_database_service import HRDatabaseService
-from app.services.intent_router_service import IntentRouterService
+from app.services.llm_router_service import LLMRouterService
 from app.services.openai_service import OpenAIService
 from app.services.prompt_builder_service import PromptBuilderService
 from app.services.retriever_service import RetrieverService
@@ -27,15 +27,15 @@ class RAGService:
         self.prompt_builder_service = PromptBuilderService()
         self.answer_generation_service = AnswerGenerationService(self.openai_service)
         self.grounding_evaluator_service = GroundingEvaluatorService()
-        self.intent_router_service = IntentRouterService()
+        self.llm_router_service = LLMRouterService(self.openai_service)
         self.hr_database_service = HRDatabaseService(settings)
         self.sql_query_builder_service = SQLQueryBuilderService()
         self.sql_tool_service = SQLToolService(self.hr_database_service)
         self.structured_answer_service = StructuredAnswerService()
 
     async def answer_question(self, payload: ChatRequest) -> ChatResponse:
-        route = self.intent_router_service.route(payload.question)
-        if route == "structured_hr":
+        decision = self.llm_router_service.route(payload.question, payload.history)
+        if decision.route == "structured_hr":
             return self._answer_structured_question(payload)
 
         return self._answer_policy_question(payload)
